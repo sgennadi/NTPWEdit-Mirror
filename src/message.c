@@ -19,6 +19,8 @@
 #define STRICT
 #include <windows.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include "dialogs.h"
 #include "ctl_groupbox.h"
 #include "ctl_image.h"

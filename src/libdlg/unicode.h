@@ -1,5 +1,6 @@
 #ifndef __UNICODE_H__
 #define __UNICODE_H__
+#include <shellapi.h>
 
 void UnicodeInit(void);
 BOOL IsRealUnicode(void);

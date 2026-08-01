@@ -19,6 +19,8 @@
 #define STRICT
 #include <windows.h>
 #include <commctrl.h>
+#include <commdlg.h>
+#include <shellapi.h>
 #include <stdlib.h>
 #include "ntpw.h"
 #include "log.h"
@@ -35,6 +37,7 @@
 #include "dlgabout.h"
 #include "dlghiber.h"
 #include "version.h"
+#include "guiargs.h"
 
 #define DEF_SAM_PATH L"C:\\WINDOWS\\SYSTEM32\\CONFIG\\SAM"
 #define HIBR_TAG_LEN 4
@@ -206,10 +209,14 @@ static INT_PTR Edit_PATH(
 
     (void)id; /* Unused */
     (void)lParam; /* Unused */
-
-    /* Update initial SAM path in dialog */
+    /* NTPWEDIT_ENTERPRISE_GUI_PATH_BEGIN */
     if(WM_INITDIALOG == msg)
-        SetDlgItemTextW(window, ID_EDIT_PATH, SearchSAM());
+        {
+        WCHAR const *enterprise_path=GuiArgsSamPath();
+        SetDlgItemTextW(window, ID_EDIT_PATH,
+            enterprise_path ? enterprise_path : SearchSAM());
+        }
+    /* NTPWEDIT_ENTERPRISE_GUI_PATH_END */
 
     if(WM_INITDIALOG==msg || (WM_COMMAND==msg && EN_CHANGE==HIWORD(wParam)))
         {
@@ -235,6 +242,13 @@ static INT_PTR Button_OPEN(
     (void)wParam; /* Unused */
     (void)lParam; /* Unused */
 
+    /* NTPWEDIT_ENTERPRISE_GUI_AUTOOPEN_BEGIN */
+    if(WM_INITDIALOG==msg && GuiArgsShouldAutoOpen())
+        {
+        PostMessage(window, WM_COMMAND, ID_BUTTON_OPEN, 0);
+        return TRUE;
+        }
+    /* NTPWEDIT_ENTERPRISE_GUI_AUTOOPEN_END */
     if(WM_COMMAND==msg)
         {
         GetDlgItemText(window, ID_EDIT_PATH, path, sizeof(path));
@@ -253,7 +267,10 @@ static INT_PTR Button_OPEN(
                 L"so changes cannot be saved!\n\n"
                 L"Modify file attributes/permissions\n"
                 L"to allow write access, and reopen it.", MB_OK);
+                /* NTPWEDIT_ENTERPRISE_GUI_SELECT_BEGIN */
         DisableUserOptions(window);
+        GuiArgsSelectUser(GetDlgItem(window, ID_LIST_USERS));
+        /* NTPWEDIT_ENTERPRISE_GUI_SELECT_END */
         CheckSave(window);
         return TRUE;
         }
@@ -535,6 +552,7 @@ int main(void)
     HWND window;
 
     UnicodeInit();
+    GuiArgsInitialize();
 
     /* Set icon for dialog windows */
     window=CreateWindow(WC_DIALOG, "", 0,

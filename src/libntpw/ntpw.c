@@ -202,6 +202,83 @@ struct user_info *next_user(struct search_user *su)
     return ui;
     }
 
+/* NTPWEDIT_ENTERPRISE_ACCOUNT_STATUS_BEGIN */
+static int enterprise_store_user_f(int rid, struct keyval *value)
+    {
+    char path[sizeof(user_path_1)+8+sizeof(user_path_F)];
+    sprintf(path, "%s%08X%s", user_path_1, rid&0xFFFFFFFFu, user_path_F);
+    return put_buf2val(hive[H_SAM], value, 0, path, REG_BINARY, TPF_VK_EXACT) ? 1 : 0;
+    }
+
+int get_account_status(int rid, struct account_status *status)
+    {
+    struct user_F *f;
+    struct keyval *value;
+    unsigned short acb;
+
+    if(NULL==status)
+        return 0;
+    memset(status, 0, sizeof(*status));
+
+    value=get_user_f(rid);
+    if(NULL==value)
+        return 0;
+
+    f=(struct user_F *)&value->data;
+    acb=f->ACB_bits;
+    status->acb_bits=acb;
+    status->failed_count=f->failedcnt;
+    status->login_count=f->logins;
+    status->lockout_threshold=(max_sam_lock > 0) ? max_sam_lock : 0;
+    status->disabled=(acb & ACB_DISABLED) ? 1 : 0;
+    status->auto_locked=(acb & ACB_AUTOLOCK) ? 1 : 0;
+    status->locked_by_count=(max_sam_lock > 0 && f->failedcnt > 0 && f->failedcnt >= max_sam_lock) ? 1 : 0;
+    status->locked=(status->auto_locked || status->locked_by_count) ? 1 : 0;
+    status->password_never_expires=(acb & ACB_PWNOEXP) ? 1 : 0;
+    status->password_not_required=(acb & ACB_PWNOTREQ) ? 1 : 0;
+    status->normal_account=(acb & ACB_NORMAL) ? 1 : 0;
+
+    free(value);
+    return 1;
+    }
+
+int clear_account_lockout(int rid)
+    {
+    struct user_F *f;
+    struct keyval *value;
+    int result;
+
+    value=get_user_f(rid);
+    if(NULL==value)
+        return 0;
+    f=(struct user_F *)&value->data;
+    f->ACB_bits &= ~ACB_AUTOLOCK;
+    f->failedcnt=0;
+    result=enterprise_store_user_f(rid, value);
+    free(value);
+    return result;
+    }
+
+int set_account_enabled(int rid, int enabled)
+    {
+    struct user_F *f;
+    struct keyval *value;
+    int result;
+
+    value=get_user_f(rid);
+    if(NULL==value)
+        return 0;
+    f=(struct user_F *)&value->data;
+    if(enabled)
+        f->ACB_bits &= ~ACB_DISABLED;
+    else
+        f->ACB_bits |= ACB_DISABLED;
+    result=enterprise_store_user_f(rid, value);
+    free(value);
+    return result;
+    }
+/* NTPWEDIT_ENTERPRISE_ACCOUNT_STATUS_END */
+
 int is_account_locked(int rid)
     {
     struct user_F *f;
